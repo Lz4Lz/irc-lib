@@ -2,7 +2,7 @@ package golog
 
 import (
 	log "github.com/fluffle/golog/logging"
-	"github.com/lz4lz/irc/pkg/irc/logging"
+	"github.com/lz4lz/irc-lib/logging"
 )
 
 // Simple adapter to utilise my logging package with goirc.

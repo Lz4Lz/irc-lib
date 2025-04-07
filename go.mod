@@ -1,4 +1,4 @@
-module github.com/lz4lz/irc/pkg/irc
+module github.com/lz4lz/irc-lib
 
 require (
 	github.com/emersion/go-sasl v0.0.0-20220912192320-0145f2c60ead

@@ -13,8 +13,8 @@ import (
 	"time"
 
 	sasl "github.com/emersion/go-sasl"
-	"github.com/lz4lz/irc/pkg/irc/logging"
-	"github.com/lz4lz/irc/pkg/irc/state"
+	"github.com/lz4lz/irc-lib/logging"
+	"github.com/lz4lz/irc-lib/state"
 	"golang.org/x/net/proxy"
 )
 

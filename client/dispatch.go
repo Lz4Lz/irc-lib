@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/lz4lz/irc/pkg/irc/logging"
+	"github.com/lz4lz/irc-lib/logging"
 )
 
 // Handlers are triggered on incoming Lines from the server, with the handler

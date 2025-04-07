@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
-	"github.com/lz4lz/irc/pkg/irc/state"
+	"github.com/lz4lz/irc-lib/state"
 )
 
 type checker struct {

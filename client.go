@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	irc "github.com/lz4lz/irc/pkg/irc/client"
+	irc "github.com/lz4lz/irc-lib/client"
 )
 
 var host *string = flag.String("host", "irc.freenode.net", "IRC server")

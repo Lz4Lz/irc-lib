@@ -11,7 +11,7 @@ import (
 
 	"encoding/base64"
 
-	"github.com/lz4lz/irc/pkg/irc/logging"
+	"github.com/lz4lz/irc-lib/logging"
 )
 
 // saslCap is the IRCv3 capability used for SASL authentication.

@@ -6,7 +6,7 @@ package client
 import (
 	"strings"
 
-	"github.com/lz4lz/irc/pkg/irc/logging"
+	"github.com/lz4lz/irc-lib/logging"
 )
 
 var stHandlers = map[string]HandlerFunc{

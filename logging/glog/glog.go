@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/golang/glog"
-	"github.com/lz4lz/irc/pkg/irc/logging"
+	"github.com/lz4lz/irc-lib/logging"
 )
 
 // Simple adapter to utilise Google's GLog package with goirc.

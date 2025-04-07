@@ -1,7 +1,7 @@
 package state
 
 import (
-	"github.com/lz4lz/irc/pkg/irc/logging"
+	"github.com/lz4lz/irc-lib/logging"
 
 	"reflect"
 	"strconv"
