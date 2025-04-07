@@ -5,7 +5,7 @@ Go IRC Client Framework
 
 Pretty simple, really:
 
-	go get github.com/lz4lz/irc/pkg/irc/client
+	go get github.com/lz4lz/irc-lib/client
 
 There is some example code that demonstrates usage of the library in `client.go`. This will connect to freenode and join `#go-nuts` by default, so be careful ;-)
 
@@ -22,7 +22,7 @@ import (
 	"crypto/tls"
 	"fmt"
 
-	irc "github.com/lz4lz/irc/pkg/irc/client"
+	irc "github.com/lz4lz/irc-lib/client"
 )
 
 func main() {
