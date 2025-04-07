@@ -1,7 +1,5 @@
-[![Build Status](https://api.travis-ci.org/fluffle/goirc.svg)](https://travis-ci.org/fluffle/goirc)
-
-GoIRC Client Framework
-======================
+Go IRC Client Framework
+=======================
 
 ### Acquiring and Building
 
@@ -82,11 +80,6 @@ and `DisableStateTracking()` respectively. Doing this while connected to an IRC
 server will probably result in an inconsistent state and a lot of warnings to
 STDERR ;-)
 
-### Projects using GoIRC
-
-- [xdcc-cli](https://github.com/ostafen/xdcc-cli): A command line tool for searching and downloading files from the IRC network.
-
-
 ### Misc.
 
 Sorry the documentation is crap. Use the source, Luke.
@@ -97,7 +90,7 @@ indebted to Matt Gruen for his work on
 the re-organisation and channel-based communication structure of `*Conn.send()`
 and `*Conn.recv()`. I'm sure things could be more asynchronous, still.
 
-This code is (c) 2009-23 Alex Bramley, and released under the same licence terms
+This code is (c) 2009-23 Alex Bramley, (c) 2025 KernelPanic451, (c) 2025 Lz4Lz and released under the same licence terms
 as Go itself.
 
 Contributions gratefully received from:
