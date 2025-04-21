@@ -20,18 +20,21 @@ const saslCap = "sasl"
 // sets up the internal event handlers to do essential IRC protocol things
 var internalHandlers = map[string]HandlerFunc{
 	REGISTER:     (*Connection).h_REGISTER,
-	"001":        (*Connection).h_001,
-	"433":        (*Connection).h_433,
+	"001":        (*Connection).h_001, // RPL_WELCOME: Welcome message
+	"433":        (*Connection).h_433, // ERR_NICKNAMEINUSE: Chosen nick is occupied
 	CTCP:         (*Connection).h_CTCP,
 	NICK:         (*Connection).h_NICK,
 	PING:         (*Connection).h_PING,
 	CAP:          (*Connection).h_CAP,
-	"410":        (*Connection).h_410,
+	"410":        (*Connection).h_410, // ERR_INVALIDCAPCMD: Invalid cap command
 	AUTHENTICATE: (*Connection).h_AUTHENTICATE,
-	"903":        (*Connection).h_903,
-	"904":        (*Connection).h_904,
-	"908":        (*Connection).h_908,
+	"903":        (*Connection).h_903, // RPL_SASLSUCCESS: SASL authentication successful
+	"904":        (*Connection).h_904, // ERR_SASLFAIL: SASL authentication failed
+	"908":        (*Connection).h_908, // RPL_SASLMECHS: Supported SASL mechanisms
 }
+
+// most irc numerics are documented here: https://modern.ircdocs.horse/#numerics
+// a better list of possible lines can be found here: https://ircv3.net/registry
 
 // set up the ircv3 capabilities supported by this client which will be requested by default to the server.
 var defaultCaps = []string{}
