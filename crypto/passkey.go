@@ -90,7 +90,7 @@ func PasskeyEncryptString(plaintext, passkey string) (string, error) {
 	data := []byte(plaintext)
 	result, err := PasskeyEncrypt(data, passkey)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 	return base64.StdEncoding.EncodeToString(result), nil
 }
