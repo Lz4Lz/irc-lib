@@ -24,7 +24,7 @@ func (c checker) call() {
 	c.c <- struct{}{}
 }
 
-func (c checker) Handle(_ *Conn, _ *Line) {
+func (c checker) Handle(_ *Connection, _ *Line) {
 	c.call()
 }
 
@@ -49,16 +49,16 @@ type testState struct {
 	ctrl *gomock.Controller
 	st   *state.MockTracker
 	nc   *mockNetConn
-	c    *Conn
+	c    *Connection
 }
 
 // NOTE: including a second argument at all prevents calling c.postConnect()
-func setUp(t *testing.T, start ...bool) (*Conn, *testState) {
+func setUp(t *testing.T, start ...bool) (*Connection, *testState) {
 	ctrl := gomock.NewController(t)
 	st := state.NewMockTracker(ctrl)
 	nc := MockNetConn(t)
 	c := SimpleClient("test", "test", "Testing IRC")
-	c.initialise()
+	c.initialize()
 	ctx := context.Background()
 
 	c.st = st
@@ -137,22 +137,22 @@ func TestClientAndStateTracking(t *testing.T) {
 		t.Errorf("Conn.cfg.Me not correctly initialised.")
 	}
 	// Check that the internal handlers are correctly set up
-	for k, _ := range intHandlers {
-		if _, ok := c.intHandlers.set[strings.ToLower(k)]; !ok {
+	for k, _ := range internalHandlers {
+		if _, ok := c.internalHandlers.set[strings.ToLower(k)]; !ok {
 			t.Errorf("Missing internal handler for '%s'.", k)
 		}
 	}
 
 	// Now enable the state tracking code and check its handlers
 	c.EnableStateTracking()
-	for k, _ := range stHandlers {
-		if _, ok := c.intHandlers.set[strings.ToLower(k)]; !ok {
+	for k, _ := range stateHandlers {
+		if _, ok := c.internalHandlers.set[strings.ToLower(k)]; !ok {
 			t.Errorf("Missing state handler for '%s'.", k)
 		}
 	}
-	if len(c.stRemovers) != len(stHandlers) {
+	if len(c.stRemovers) != len(stateHandlers) {
 		t.Errorf("Incorrect number of Removers (%d != %d) when adding state handlers.",
-			len(c.stRemovers), len(stHandlers))
+			len(c.stRemovers), len(stateHandlers))
 	}
 	if neu := c.Me(); neu.Nick != me.Nick || neu.Ident != me.Ident ||
 		neu.Name != me.Name || neu.Host != me.Host {
@@ -180,8 +180,8 @@ func TestClientAndStateTracking(t *testing.T) {
 	}
 
 	// Finally, check state tracking handlers were all removed correctly
-	for k, _ := range stHandlers {
-		if _, ok := c.intHandlers.set[strings.ToLower(k)]; ok && k != "NICK" {
+	for k, _ := range stateHandlers {
+		if _, ok := c.internalHandlers.set[strings.ToLower(k)]; ok && k != "NICK" {
 			// A bit leaky, because intHandlers adds a NICK handler.
 			t.Errorf("State handler for '%s' not removed correctly.", k)
 		}
@@ -293,7 +293,7 @@ func TestSendDeadlockOnFullBuffer(t *testing.T) {
 		}
 	}()
 	// Then we add a handler that tries to write a line to conn.out:
-	c.HandleFunc(PRIVMSG, func(conn *Conn, line *Line) {
+	c.HandleFunc(PRIVMSG, func(conn *Connection, line *Line) {
 		conn.Raw(line.Raw)
 	})
 	// And trigger it by starting runLoop and inserting a line into conn.in:
@@ -547,7 +547,7 @@ func TestWrite(t *testing.T) {
 	s.nc.Expect("she so useless")
 
 	// The lastsent time should have been updated very recently...
-	if time.Now().Sub(c.lastsent) > time.Millisecond {
+	if time.Now().Sub(c.lastSent) > time.Millisecond {
 		t.Errorf("Flood control not used when Flood = false.")
 	}
 
@@ -579,7 +579,7 @@ func TestRateLimit(t *testing.T) {
 	// of this test was probably around 1.2 ms ago. This is inconvenient.
 	// Making it >10s ago effectively clears out the inconsistency, as this
 	// makes elapsed > linetime and thus zeros c.badness and resets c.lastsent.
-	c.lastsent = time.Now().Add(-10 * time.Second)
+	c.lastSent = time.Now().Add(-10 * time.Second)
 	if l := c.rateLimit(60); l != 0 || c.badness != 0 {
 		t.Errorf("Rate limit got non-zero badness from long-ago lastsent.")
 	}

@@ -20,12 +20,12 @@ func main() {
 	c := irc.SimpleClient("GoTest", "gotest")
 	c.EnableStateTracking()
 	c.HandleFunc("connected",
-		func(conn *irc.Conn, line *irc.Line) { conn.Join(*channel) })
+		func(conn *irc.Connection, line *irc.Line) { conn.Join(*channel) })
 
 	// Set up a handler to notify of disconnect events.
 	quit := make(chan bool)
 	c.HandleFunc("disconnected",
-		func(conn *irc.Conn, line *irc.Line) { quit <- true })
+		func(conn *irc.Connection, line *irc.Line) { quit <- true })
 
 	// set up a goroutine to read commands from stdin
 	in := make(chan string, 4)
@@ -52,7 +52,7 @@ func main() {
 			if cmd[0] == ':' {
 				switch idx := strings.Index(cmd, " "); {
 				case cmd[1] == 'd':
-					fmt.Printf(c.String())
+					fmt.Print(c.String())
 				case cmd[1] == 'n':
 					parts := strings.Split(cmd, " ")
 					username := strings.TrimSpace(parts[1])

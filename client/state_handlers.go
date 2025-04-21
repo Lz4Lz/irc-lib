@@ -9,29 +9,29 @@ import (
 	"github.com/lz4lz/irc-lib/logging"
 )
 
-var stHandlers = map[string]HandlerFunc{
-	"JOIN":  (*Conn).h_JOIN,
-	"KICK":  (*Conn).h_KICK,
-	"MODE":  (*Conn).h_MODE,
-	"NICK":  (*Conn).h_STNICK,
-	"PART":  (*Conn).h_PART,
-	"QUIT":  (*Conn).h_QUIT,
-	"TOPIC": (*Conn).h_TOPIC,
-	"311":   (*Conn).h_311,
-	"324":   (*Conn).h_324,
-	"332":   (*Conn).h_332,
-	"352":   (*Conn).h_352,
-	"353":   (*Conn).h_353,
-	"671":   (*Conn).h_671,
+var stateHandlers = map[string]HandlerFunc{
+	"JOIN":  (*Connection).h_JOIN,
+	"KICK":  (*Connection).h_KICK,
+	"MODE":  (*Connection).h_MODE,
+	"NICK":  (*Connection).h_STNICK,
+	"PART":  (*Connection).h_PART,
+	"QUIT":  (*Connection).h_QUIT,
+	"TOPIC": (*Connection).h_TOPIC,
+	"311":   (*Connection).h_311,
+	"324":   (*Connection).h_324,
+	"332":   (*Connection).h_332,
+	"352":   (*Connection).h_352,
+	"353":   (*Connection).h_353,
+	"671":   (*Connection).h_671,
 }
 
-func (conn *Conn) addSTHandlers() {
-	for n, h := range stHandlers {
+func (conn *Connection) addSTHandlers() {
+	for n, h := range stateHandlers {
 		conn.stRemovers = append(conn.stRemovers, conn.handle(n, h))
 	}
 }
 
-func (conn *Conn) delSTHandlers() {
+func (conn *Connection) delSTHandlers() {
 	for _, h := range conn.stRemovers {
 		h.Remove()
 	}
@@ -39,13 +39,13 @@ func (conn *Conn) delSTHandlers() {
 }
 
 // Handle NICK messages that need to update the state tracker
-func (conn *Conn) h_STNICK(line *Line) {
+func (conn *Connection) h_STNICK(line *Line) {
 	// all nicks should be handled the same way, our own included
 	conn.st.ReNick(line.Nick, line.Args[0])
 }
 
 // Handle JOINs to channels to maintain state
-func (conn *Conn) h_JOIN(line *Line) {
+func (conn *Connection) h_JOIN(line *Line) {
 	ch := conn.st.GetChannel(line.Args[0])
 	nk := conn.st.GetNick(line.Nick)
 	if ch == nil {
@@ -77,12 +77,12 @@ func (conn *Conn) h_JOIN(line *Line) {
 }
 
 // Handle PARTs from channels to maintain state
-func (conn *Conn) h_PART(line *Line) {
+func (conn *Connection) h_PART(line *Line) {
 	conn.st.Dissociate(line.Args[0], line.Nick)
 }
 
 // Handle KICKs from channels to maintain state
-func (conn *Conn) h_KICK(line *Line) {
+func (conn *Connection) h_KICK(line *Line) {
 	if !line.argslen(1) {
 		return
 	}
@@ -92,12 +92,12 @@ func (conn *Conn) h_KICK(line *Line) {
 }
 
 // Handle other people's QUITs
-func (conn *Conn) h_QUIT(line *Line) {
+func (conn *Connection) h_QUIT(line *Line) {
 	conn.st.DelNick(line.Nick)
 }
 
 // Handle MODE changes for channels we know about (and our nick personally)
-func (conn *Conn) h_MODE(line *Line) {
+func (conn *Connection) h_MODE(line *Line) {
 	if !line.argslen(1) {
 		return
 	}
@@ -119,7 +119,7 @@ func (conn *Conn) h_MODE(line *Line) {
 }
 
 // Handle TOPIC changes for channels
-func (conn *Conn) h_TOPIC(line *Line) {
+func (conn *Connection) h_TOPIC(line *Line) {
 	if !line.argslen(1) {
 		return
 	}
@@ -132,7 +132,7 @@ func (conn *Conn) h_TOPIC(line *Line) {
 }
 
 // Handle 311 whois reply
-func (conn *Conn) h_311(line *Line) {
+func (conn *Connection) h_311(line *Line) {
 	if !line.argslen(5) {
 		return
 	}
@@ -145,7 +145,7 @@ func (conn *Conn) h_311(line *Line) {
 }
 
 // Handle 324 mode reply
-func (conn *Conn) h_324(line *Line) {
+func (conn *Connection) h_324(line *Line) {
 	if !line.argslen(2) {
 		return
 	}
@@ -158,7 +158,7 @@ func (conn *Conn) h_324(line *Line) {
 }
 
 // Handle 332 topic reply on join to channel
-func (conn *Conn) h_332(line *Line) {
+func (conn *Connection) h_332(line *Line) {
 	if !line.argslen(2) {
 		return
 	}
@@ -171,7 +171,7 @@ func (conn *Conn) h_332(line *Line) {
 }
 
 // Handle 352 who reply
-func (conn *Conn) h_352(line *Line) {
+func (conn *Connection) h_352(line *Line) {
 	if !line.argslen(5) {
 		return
 	}
@@ -204,7 +204,7 @@ func (conn *Conn) h_352(line *Line) {
 }
 
 // Handle 353 names reply
-func (conn *Conn) h_353(line *Line) {
+func (conn *Connection) h_353(line *Line) {
 	if !line.argslen(2) {
 		return
 	}
@@ -249,7 +249,7 @@ func (conn *Conn) h_353(line *Line) {
 }
 
 // Handle 671 whois reply (nick connected via SSL)
-func (conn *Conn) h_671(line *Line) {
+func (conn *Connection) h_671(line *Line) {
 	if !line.argslen(1) {
 		return
 	}

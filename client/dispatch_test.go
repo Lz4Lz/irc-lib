@@ -18,7 +18,7 @@ func TestHandlerSet(t *testing.T) {
 	}
 
 	callcount := new(int32)
-	f := func(_ *Conn, _ *Line) {
+	f := func(_ *Connection, _ *Line) {
 		atomic.AddInt32(callcount, 1)
 	}
 
@@ -188,12 +188,12 @@ func TestPanicRecovery(t *testing.T) {
 	defer s.tearDown()
 
 	recovered := callCheck(t)
-	c.cfg.Recover = func(conn *Conn, line *Line) {
+	c.cfg.Recover = func(conn *Connection, line *Line) {
 		if err, ok := recover().(string); ok && err == "panic!" {
 			recovered.call()
 		}
 	}
-	c.HandleFunc(PRIVMSG, func(conn *Conn, line *Line) {
+	c.HandleFunc(PRIVMSG, func(conn *Connection, line *Line) {
 		panic("panic!")
 	})
 	c.in <- ParseLine(":nick!user@host.com PRIVMSG #channel :OH NO PIGEONS")

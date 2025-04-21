@@ -47,7 +47,7 @@ func Test001(t *testing.T) {
 	l := ParseLine(":irc.server.org 001 newnick :Welcome to IRC newnick!ident@somehost.com")
 	// Set up a handler to detect whether connected handler is called from 001
 	hcon := false
-	c.HandleFunc("connected", func(conn *Conn, line *Line) {
+	c.HandleFunc("connected", func(conn *Connection, line *Line) {
 		hcon = true
 	})
 
@@ -462,7 +462,7 @@ func TestCap(t *testing.T) {
 	defer s.tearDown()
 
 	c.Config().EnableCapabilityNegotiation = true
-	c.Config().Capabilites = []string{"cap1", "cap2", "cap3", "cap4"}
+	c.Config().Capabilities = []string{"cap1", "cap2", "cap3", "cap4"}
 
 	c.h_REGISTER(&Line{Cmd: REGISTER})
 	s.nc.Expect("CAP LS")

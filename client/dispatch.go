@@ -23,7 +23,7 @@ import (
 // Background handlers are run in parallel and do not block the event loop.
 // This is useful for things that may need to do significant work.
 type Handler interface {
-	Handle(*Conn, *Line)
+	Handle(*Connection, *Line)
 }
 
 // Removers allow for a handler that has been previously added to the client
@@ -33,10 +33,10 @@ type Remover interface {
 }
 
 // HandlerFunc allows a bare function with this signature to implement the
-// Handler interface. It is used by Conn.HandleFunc.
-type HandlerFunc func(*Conn, *Line)
+// Handler interface. It is used by Connection.HandleFunc.
+type HandlerFunc func(*Connection, *Line)
 
-func (hf HandlerFunc) Handle(conn *Conn, line *Line) {
+func (hf HandlerFunc) Handle(conn *Connection, line *Line) {
 	hf(conn, line)
 }
 
@@ -63,7 +63,7 @@ type hNode struct {
 }
 
 // A hNode implements both Handler (with configurable panic recovery)...
-func (hn *hNode) Handle(conn *Conn, line *Line) {
+func (hn *hNode) Handle(conn *Connection, line *Line) {
 	defer conn.cfg.Recover(conn, line)
 	hn.handler.Handle(conn, line)
 }
@@ -144,7 +144,7 @@ func (hs *hSet) getHandlers(ev string) []*hNode {
 	return handlers
 }
 
-func (hs *hSet) dispatch(conn *Conn, line *Line) {
+func (hs *hSet) dispatch(conn *Connection, line *Line) {
 	ev := strings.ToLower(line.Cmd)
 	wg := &sync.WaitGroup{}
 	for _, hn := range hs.getHandlers(ev) {
@@ -159,42 +159,42 @@ func (hs *hSet) dispatch(conn *Conn, line *Line) {
 
 // Handle adds the provided handler to the foreground set for the named event.
 // It will return a Remover that allows that handler to be removed again.
-func (conn *Conn) Handle(name string, h Handler) Remover {
-	return conn.fgHandlers.add(name, h)
+func (conn *Connection) Handle(name string, h Handler) Remover {
+	return conn.foregroundHandlers.add(name, h)
 }
 
 // HandleBG adds the provided handler to the background set for the named
 // event. It may go away in the future.
 // It will return a Remover that allows that handler to be removed again.
-func (conn *Conn) HandleBG(name string, h Handler) Remover {
-	return conn.bgHandlers.add(name, h)
+func (conn *Connection) HandleBG(name string, h Handler) Remover {
+	return conn.backgroundHandlers.add(name, h)
 }
 
-func (conn *Conn) handle(name string, h Handler) Remover {
-	return conn.intHandlers.add(name, h)
+func (conn *Connection) handle(name string, h Handler) Remover {
+	return conn.internalHandlers.add(name, h)
 }
 
 // HandleFunc adds the provided function as a handler in the foreground set
 // for the named event.
 // It will return a Remover that allows that handler to be removed again.
-func (conn *Conn) HandleFunc(name string, hf HandlerFunc) Remover {
+func (conn *Connection) HandleFunc(name string, hf HandlerFunc) Remover {
 	return conn.Handle(name, hf)
 }
 
-func (conn *Conn) dispatch(line *Line) {
+func (conn *Connection) dispatch(line *Line) {
 	// We run the internal handlers first, including all state tracking ones.
 	// This ensures that user-supplied handlers that use the tracker have a
 	// consistent view of the connection state in handlers that mutate it.
-	conn.intHandlers.dispatch(conn, line)
-	go conn.bgHandlers.dispatch(conn, line)
-	conn.fgHandlers.dispatch(conn, line)
+	conn.internalHandlers.dispatch(conn, line)
+	go conn.backgroundHandlers.dispatch(conn, line)
+	conn.foregroundHandlers.dispatch(conn, line)
 }
 
 // LogPanic is used as the default panic catcher for the client. If, like me,
 // you are not good with computer, and you'd prefer your bot not to vanish into
 // the ether whenever you make unfortunate programming mistakes, you may find
 // this useful: it will recover panics from handler code and log the errors.
-func (conn *Conn) LogPanic(line *Line) {
+func (conn *Connection) LogPanic(line *Line) {
 	if err := recover(); err != nil {
 		_, f, l, _ := runtime.Caller(2)
 		logging.Error("%s:%d: panic: %v", f, l, err)

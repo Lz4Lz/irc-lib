@@ -18,26 +18,26 @@ import (
 const saslCap = "sasl"
 
 // sets up the internal event handlers to do essential IRC protocol things
-var intHandlers = map[string]HandlerFunc{
-	REGISTER:     (*Conn).h_REGISTER,
-	"001":        (*Conn).h_001,
-	"433":        (*Conn).h_433,
-	CTCP:         (*Conn).h_CTCP,
-	NICK:         (*Conn).h_NICK,
-	PING:         (*Conn).h_PING,
-	CAP:          (*Conn).h_CAP,
-	"410":        (*Conn).h_410,
-	AUTHENTICATE: (*Conn).h_AUTHENTICATE,
-	"903":        (*Conn).h_903,
-	"904":        (*Conn).h_904,
-	"908":        (*Conn).h_908,
+var internalHandlers = map[string]HandlerFunc{
+	REGISTER:     (*Connection).h_REGISTER,
+	"001":        (*Connection).h_001,
+	"433":        (*Connection).h_433,
+	CTCP:         (*Connection).h_CTCP,
+	NICK:         (*Connection).h_NICK,
+	PING:         (*Connection).h_PING,
+	CAP:          (*Connection).h_CAP,
+	"410":        (*Connection).h_410,
+	AUTHENTICATE: (*Connection).h_AUTHENTICATE,
+	"903":        (*Connection).h_903,
+	"904":        (*Connection).h_904,
+	"908":        (*Connection).h_908,
 }
 
 // set up the ircv3 capabilities supported by this client which will be requested by default to the server.
 var defaultCaps = []string{}
 
-func (conn *Conn) addIntHandlers() {
-	for n, h := range intHandlers {
+func (conn *Connection) addIntHandlers() {
+	for n, h := range internalHandlers {
 		// internal handlers are essential for the IRC client
 		// to function, so we don't save their Removers here
 		conn.handle(n, h)
@@ -45,12 +45,12 @@ func (conn *Conn) addIntHandlers() {
 }
 
 // Basic ping/pong handler
-func (conn *Conn) h_PING(line *Line) {
+func (conn *Connection) h_PING(line *Line) {
 	conn.Pong(line.Args[0])
 }
 
 // Handler for initial registration with server once tcp connection is made.
-func (conn *Conn) h_REGISTER(line *Line) {
+func (conn *Connection) h_REGISTER(line *Line) {
 	if conn.cfg.EnableCapabilityNegotiation {
 		conn.Cap(CAP_LS)
 	}
@@ -62,10 +62,10 @@ func (conn *Conn) h_REGISTER(line *Line) {
 	conn.User(conn.cfg.Me.Ident, conn.cfg.Me.Name)
 }
 
-func (conn *Conn) getRequestCapabilities() *capSet {
+func (conn *Connection) getRequestCapabilities() *capSet {
 	s := capabilitySet()
 
-	// add capabilites supported by the client
+	// add capabilities supported by the client
 	s.Add(defaultCaps...)
 
 	if conn.cfg.Sasl != nil {
@@ -73,13 +73,13 @@ func (conn *Conn) getRequestCapabilities() *capSet {
 		s.Add(saslCap)
 	}
 
-	// add capabilites requested by the user
-	s.Add(conn.cfg.Capabilites...)
+	// add capabilities requested by the user
+	s.Add(conn.cfg.Capabilities...)
 
 	return s
 }
 
-func (conn *Conn) negotiateCapabilities(supportedCaps []string) {
+func (conn *Connection) negotiateCapabilities(supportedCaps []string) {
 	conn.supportedCaps.Add(supportedCaps...)
 
 	reqCaps := conn.getRequestCapabilities()
@@ -92,10 +92,10 @@ func (conn *Conn) negotiateCapabilities(supportedCaps []string) {
 	}
 }
 
-func (conn *Conn) handleCapAck(caps []string) {
+func (conn *Connection) handleCapAck(caps []string) {
 	gotSasl := false
 	for _, cap := range caps {
-		conn.currCaps.Add(cap)
+		conn.currentCaps.Add(cap)
 
 		if conn.cfg.Sasl != nil && cap == saslCap {
 			mech, ir, err := conn.cfg.Sasl.Start()
@@ -120,7 +120,7 @@ func (conn *Conn) handleCapAck(caps []string) {
 	}
 }
 
-func (conn *Conn) handleCapNak(caps []string) {
+func (conn *Connection) handleCapNak(caps []string) {
 	conn.Cap(CAP_END)
 }
 
@@ -195,14 +195,14 @@ func (c *capSet) Size() int {
 }
 
 // This handler is triggered when an invalid cap command is received by the server.
-func (conn *Conn) h_410(line *Line) {
+func (conn *Connection) h_410(line *Line) {
 	logging.Warn("Invalid cap subcommand: ", line.Args[1])
 }
 
 // Handler for capability negotiation commands.
 // Note that even if multiple CAP_END commands may be sent to the server during negotiation,
 // only the first will be considered.
-func (conn *Conn) h_CAP(line *Line) {
+func (conn *Connection) h_CAP(line *Line) {
 	subcommand := line.Args[1]
 
 	caps := strings.Fields(line.Text())
@@ -217,7 +217,7 @@ func (conn *Conn) h_CAP(line *Line) {
 }
 
 // Handler for SASL authentication
-func (conn *Conn) h_AUTHENTICATE(line *Line) {
+func (conn *Connection) h_AUTHENTICATE(line *Line) {
 	if conn.cfg.Sasl == nil {
 		return
 	}
@@ -254,25 +254,25 @@ func (conn *Conn) h_AUTHENTICATE(line *Line) {
 }
 
 // Handler for RPL_SASLSUCCESS.
-func (conn *Conn) h_903(line *Line) {
+func (conn *Connection) h_903(line *Line) {
 	conn.Cap(CAP_END)
 }
 
 // Handler for RPL_SASLFAILURE.
-func (conn *Conn) h_904(line *Line) {
+func (conn *Connection) h_904(line *Line) {
 	logging.Warn("SASL authentication failed")
 	conn.Cap(CAP_END)
 }
 
 // Handler for RPL_SASLMECHS.
-func (conn *Conn) h_908(line *Line) {
+func (conn *Connection) h_908(line *Line) {
 	logging.Warn("SASL mechanism not supported, supported mechanisms are: %v", line.Args[1])
 	conn.Cap(CAP_END)
 }
 
 // Handler to trigger a CONNECTED event on receipt of numeric 001
 // :<server> 001 <nick> :Welcome message <nick>!<user>@<host>
-func (conn *Conn) h_001(line *Line) {
+func (conn *Connection) h_001(line *Line) {
 	// We're connected! Defer this for control flow reasons.
 	defer conn.dispatch(&Line{Cmd: CONNECTED, Time: time.Now()})
 
@@ -310,7 +310,7 @@ func (conn *Conn) h_001(line *Line) {
 */
 
 // Handler to deal with "433 :Nickname already in use"
-func (conn *Conn) h_433(line *Line) {
+func (conn *Connection) h_433(line *Line) {
 	// Args[1] is the new nick we were attempting to acquire
 	me := conn.Me()
 	neu := conn.cfg.NewNick(line.Args[1])
@@ -331,7 +331,7 @@ func (conn *Conn) h_433(line *Line) {
 }
 
 // Handle VERSION requests and CTCP PING
-func (conn *Conn) h_CTCP(line *Line) {
+func (conn *Connection) h_CTCP(line *Line) {
 	if line.Args[0] == VERSION {
 		conn.CtcpReply(line.Nick, VERSION, conn.cfg.Version)
 	} else if line.Args[0] == PING && line.argslen(2) {
@@ -340,7 +340,7 @@ func (conn *Conn) h_CTCP(line *Line) {
 }
 
 // Handle updating our own NICK if we're not using the state tracker
-func (conn *Conn) h_NICK(line *Line) {
+func (conn *Connection) h_NICK(line *Line) {
 	if conn.st == nil && line.Nick == conn.cfg.Me.Nick {
 		conn.cfg.Me.Nick = line.Args[0]
 	}

@@ -18,25 +18,25 @@ import (
 	"golang.org/x/net/proxy"
 )
 
-// Conn encapsulates a connection to a single IRC server. Create
-// one with Client or SimpleClient.
-type Conn struct {
-	// For preventing races on (dis)connect.
+// Connection encapsulates a connection to a single IRC server.
+// One can be created with Client or SimpleClient.
+type Connection struct {
+	// For preventing race conditions on (dis)connect.
 	mu sync.RWMutex
 
-	// Contains parameters that people can tweak to change client behaviour.
-	cfg *Config
+	// Contains parameters that people can tweak to change client behavior.
+	cfg *ClientConfig
 
 	// Handlers
-	intHandlers *hSet
-	fgHandlers  *hSet
-	bgHandlers  *hSet
+	internalHandlers   *hSet
+	foregroundHandlers *hSet
+	backgroundHandlers *hSet
 
-	// State tracker for nicks and channels
+	// State tracker for nicks and channels.
 	st         state.Tracker
 	stRemovers []Remover
 
-	// I/O stuff to server
+	// I/O stuff to server.
 	dialer      *net.Dialer
 	proxyDialer proxy.Dialer
 	sock        net.Conn
@@ -45,33 +45,35 @@ type Conn struct {
 	out         chan string
 	connected   bool
 
-	// Capabilities supported by the server
+	// Capabilities supported by the server.
 	supportedCaps *capSet
 
-	// Capabilites currently enabled
-	currCaps *capSet
+	// Capabilities that are currently enabled.
+	currentCaps *capSet
 
-	// SASL internals
+	// SASL internals stuff.
 	saslRemainingData []byte
 
-	// CancelFunc and WaitGroup for goroutines
+	// CancelFunc and WaitGroup for goroutines.
 	die context.CancelFunc
 	wg  sync.WaitGroup
 
-	// Internal counters for flood protection
+	// Internal counters for flood protection.
 	badness  time.Duration
-	lastsent time.Time
+	lastSent time.Time
 }
 
-// Config contains options that can be passed to Client to change the
-// behaviour of the library during use. It is recommended that NewConfig
+// ClientConfig contains options that can be passed to Client to change the
+// behavior of the library during use. It is recommended that NewClientConfig
 // is used to create this struct rather than instantiating one directly.
-// Passing a Config with no Nick in the Me field to Client will result
+// Passing a ClientConfig with no Nick in the Me field to Client will result
 // in unflattering consequences.
-type Config struct {
+type ClientConfig struct {
 	// Set this to provide the Nick, Ident and Name for the client to use.
-	// It is recommended to call Conn.Me to get up-to-date information
+	// It is recommended to call Connection.Me to get up-to-date information
 	// about the current state of the client's IRC nick after connecting.
+	// This is because the nick might be dynamically updated to account
+	// for occupied nicks.
 	Me *state.Nick
 
 	// Hostname to connect to and optional connect password.
@@ -102,7 +104,7 @@ type Config struct {
 	EnableCapabilityNegotiation bool
 
 	// A list of capabilities to request to the server during registration.
-	Capabilites []string
+	Capabilities []string
 
 	// SASL configuration to use to authenticate the connection.
 	Sasl sasl.Client
@@ -131,37 +133,37 @@ type Config struct {
 
 	// Configurable panic recovery for all handlers.
 	// Defaults to logging an error, see LogPanic.
-	Recover func(*Conn, *Line)
+	Recover func(*Connection, *Line)
 
 	// Split PRIVMSGs, NOTICEs and CTCPs longer than SplitLen characters
 	// over multiple lines. Default to 450 if not set.
 	SplitLen int
 }
 
-// NewConfig creates a Config struct containing sensible defaults.
+// NewClientConfig creates a ClientConfig struct containing sensible defaults.
 // It takes one required argument: the nick to use for the client.
 // Subsequent string arguments set the client's ident and "real"
 // name, but these are optional.
-func NewConfig(nick string, args ...string) *Config {
-	cfg := &Config{
+func NewClientConfig(nick string, args ...string) *ClientConfig {
+	cfg := &ClientConfig{
 		Me:                          &state.Nick{Nick: nick},
 		PingFreq:                    3 * time.Minute,
 		NewNick:                     DefaultNewNick,
-		Recover:                     (*Conn).LogPanic, // in dispatch.go
+		Recover:                     (*Connection).LogPanic, // in dispatch.go
 		SplitLen:                    defaultSplit,
 		Timeout:                     60 * time.Second,
 		EnableCapabilityNegotiation: false,
 	}
-	cfg.Me.Ident = "goirc"
+	cfg.Me.Ident = "irclib"
 	if len(args) > 0 && args[0] != "" {
 		cfg.Me.Ident = args[0]
 	}
-	cfg.Me.Name = "Powered by GoIRC"
+	cfg.Me.Name = "GoIRCLibClient"
 	if len(args) > 1 && args[1] != "" {
 		cfg.Me.Name = args[1]
 	}
-	cfg.Version = "Powered by GoIRC"
-	cfg.QuitMessage = "GoBye!"
+	cfg.Version = "GoIRCLibClient"
+	cfg.QuitMessage = "Goodbye!"
 	return cfg
 }
 
@@ -190,21 +192,21 @@ func DefaultNewNick(old string) string {
 // SimpleClient creates a new Conn, passing its arguments to NewConfig.
 // If you don't need to change any client options and just want to get
 // started quickly, this is a convenient shortcut.
-func SimpleClient(nick string, args ...string) *Conn {
-	conn := Client(NewConfig(nick, args...))
+func SimpleClient(nick string, args ...string) *Connection {
+	conn := Client(NewClientConfig(nick, args...))
 	return conn
 }
 
 // Client takes a Config struct and returns a new Conn ready to have
 // handlers added and connect to a server.
-func Client(cfg *Config) *Conn {
+func Client(cfg *ClientConfig) *Connection {
 	if cfg == nil {
-		cfg = NewConfig("__idiot__")
+		cfg = NewClientConfig("__undefined__")
 	}
 	if cfg.Me == nil || cfg.Me.Nick == "" || cfg.Me.Ident == "" {
-		cfg.Me = &state.Nick{Nick: "__idiot__"}
-		cfg.Me.Ident = "goirc"
-		cfg.Me.Name = "Powered by GoIRC"
+		cfg.Me = &state.Nick{Nick: "__undefined__"}
+		cfg.Me.Ident = "irclib"
+		cfg.Me.Name = "GoIRCLibClient"
 	}
 
 	dialer := new(net.Dialer)
@@ -228,17 +230,17 @@ func Client(cfg *Config) *Conn {
 		cfg.EnableCapabilityNegotiation = true
 	}
 
-	conn := &Conn{
-		cfg:               cfg,
-		dialer:            dialer,
-		intHandlers:       handlerSet(),
-		fgHandlers:        handlerSet(),
-		bgHandlers:        handlerSet(),
-		stRemovers:        make([]Remover, 0, len(stHandlers)),
-		lastsent:          time.Now(),
-		supportedCaps:     capabilitySet(),
-		currCaps:          capabilitySet(),
-		saslRemainingData: nil,
+	conn := &Connection{
+		cfg:                cfg,
+		dialer:             dialer,
+		internalHandlers:   handlerSet(),
+		foregroundHandlers: handlerSet(),
+		backgroundHandlers: handlerSet(),
+		stRemovers:         make([]Remover, 0, len(stateHandlers)),
+		lastSent:           time.Now(),
+		supportedCaps:      capabilitySet(),
+		currentCaps:        capabilitySet(),
+		saslRemainingData:  nil,
 	}
 	conn.addIntHandlers()
 	return conn
@@ -247,7 +249,7 @@ func Client(cfg *Config) *Conn {
 // Connected returns true if the client is successfully connected to
 // an IRC server. It becomes true when the TCP connection is established,
 // and false again when the connection is closed.
-func (conn *Conn) Connected() bool {
+func (conn *Connection) Connected() bool {
 	conn.mu.RLock()
 	defer conn.mu.RUnlock()
 	return conn.connected
@@ -255,20 +257,20 @@ func (conn *Conn) Connected() bool {
 
 // Config returns a pointer to the Config struct used by the client.
 // Many of the elements of Config may be changed at any point to
-// affect client behaviour. To disable flood protection temporarily,
+// affect client behavior. To disable flood protection temporarily,
 // for example, a handler could do:
 //
 //	conn.Config().Flood = true
 //	// Send many lines to the IRC server, risking "excess flood"
 //	conn.Config().Flood = false
-func (conn *Conn) Config() *Config {
+func (conn *Connection) Config() *ClientConfig {
 	return conn.cfg
 }
 
 // Me returns a state.Nick that reflects the client's IRC nick at the
 // time it is called. If state tracking is enabled, this comes from
 // the tracker, otherwise it is equivalent to conn.cfg.Me.
-func (conn *Conn) Me() *state.Nick {
+func (conn *Connection) Me() *state.Nick {
 	if conn.st != nil {
 		conn.cfg.Me = conn.st.Me()
 	}
@@ -277,7 +279,7 @@ func (conn *Conn) Me() *state.Nick {
 
 // StateTracker returns the state tracker being used by the client,
 // if tracking is enabled, and nil otherwise.
-func (conn *Conn) StateTracker() state.Tracker {
+func (conn *Connection) StateTracker() state.Tracker {
 	return conn.st
 }
 
@@ -290,7 +292,7 @@ func (conn *Conn) StateTracker() state.Tracker {
 // state tracker to become very confused all over STDERR if logging
 // is enabled. State tracking should enabled before connecting or
 // at a pinch while the client is not joined to any channels.
-func (conn *Conn) EnableStateTracking() {
+func (conn *Connection) EnableStateTracking() {
 	conn.mu.Lock()
 	defer conn.mu.Unlock()
 	if conn.st == nil {
@@ -305,7 +307,7 @@ func (conn *Conn) EnableStateTracking() {
 // DisableStateTracking causes the client to stop tracking information
 // about the channels and nicks it knows of. It will also wipe current
 // state from the state tracker.
-func (conn *Conn) DisableStateTracking() {
+func (conn *Connection) DisableStateTracking() {
 	conn.mu.Lock()
 	defer conn.mu.Unlock()
 	if conn.st != nil {
@@ -317,17 +319,17 @@ func (conn *Conn) DisableStateTracking() {
 }
 
 // SupportsCapability returns true if the server supports the given capability.
-func (conn *Conn) SupportsCapability(cap string) bool {
+func (conn *Connection) SupportsCapability(cap string) bool {
 	return conn.supportedCaps.Has(cap)
 }
 
 // HasCapability returns true if the given capability has been acked by the server during negotiation.
-func (conn *Conn) HasCapability(cap string) bool {
-	return conn.currCaps.Has(cap)
+func (conn *Connection) HasCapability(cap string) bool {
+	return conn.currentCaps.Has(cap)
 }
 
-// Per-connection state initialisation.
-func (conn *Conn) initialise() {
+// Per-connection state initialization.
+func (conn *Connection) initialize() {
 	conn.io = nil
 	conn.sock = nil
 	conn.in = make(chan *Line, 32)
@@ -342,12 +344,12 @@ func (conn *Conn) initialise() {
 // a hostname or an IP address, with an optional port. It sets the client's
 // Config.Server to host, Config.Pass to pass if one is provided, and then
 // calls Connect.
-func (conn *Conn) ConnectTo(host string, pass ...string) error {
+func (conn *Connection) ConnectTo(host string, pass ...string) error {
 	return conn.ConnectToContext(context.Background(), host, pass...)
 }
 
 // ConnectToContext works like ConnectTo but uses the provided context.
-func (conn *Conn) ConnectToContext(ctx context.Context, host string, pass ...string) error {
+func (conn *Connection) ConnectToContext(ctx context.Context, host string, pass ...string) error {
 	conn.cfg.Server = host
 	if len(pass) > 0 {
 		conn.cfg.Pass = pass[0]
@@ -366,12 +368,12 @@ func (conn *Conn) ConnectToContext(ctx context.Context, host string, pass ...str
 // will be fired. This is mostly for internal use; it is suggested that a
 // handler for the CONNECTED event is used to perform any initial client work
 // like joining channels and sending messages.
-func (conn *Conn) Connect() error {
+func (conn *Connection) Connect() error {
 	return conn.ConnectContext(context.Background())
 }
 
 // ConnectContext works like Connect but uses the provided context.
-func (conn *Conn) ConnectContext(ctx context.Context) error {
+func (conn *Connection) ConnectContext(ctx context.Context) error {
 	// We don't want to hold conn.mu while firing the REGISTER event,
 	// and it's much easier and less error prone to defer the unlock,
 	// so the connect mechanics have been delegated to internalConnect.
@@ -383,16 +385,16 @@ func (conn *Conn) ConnectContext(ctx context.Context) error {
 }
 
 // internalConnect handles the work of actually connecting to the server.
-func (conn *Conn) internalConnect(ctx context.Context) error {
+func (conn *Connection) internalConnect(ctx context.Context) error {
 	conn.mu.Lock()
 	defer conn.mu.Unlock()
-	conn.initialise()
+	conn.initialize()
 
 	if conn.cfg.Server == "" {
 		return fmt.Errorf("irc.Connect(): cfg.Server must be non-empty")
 	}
 	if conn.connected {
-		return fmt.Errorf("irc.Connect(): Cannot connect to %s, already connected.", conn.cfg.Server)
+		return fmt.Errorf("irc.Connect(): Cannot connect to %s, already connected", conn.cfg.Server)
 	}
 
 	if !hasPort(conn.cfg.Server) {
@@ -435,7 +437,7 @@ func (conn *Conn) internalConnect(ctx context.Context) error {
 }
 
 // dialProxy handles dialling via a proxy
-func (conn *Conn) dialProxy(ctx context.Context) (net.Conn, error) {
+func (conn *Connection) dialProxy(ctx context.Context) (net.Conn, error) {
 	proxyURL, err := url.Parse(conn.cfg.Proxy)
 	if err != nil {
 		return nil, fmt.Errorf("parsing url: %v", err)
@@ -457,7 +459,7 @@ func (conn *Conn) dialProxy(ctx context.Context) (net.Conn, error) {
 }
 
 // postConnect performs post-connection setup, for ease of testing.
-func (conn *Conn) postConnect(ctx context.Context, start bool) {
+func (conn *Connection) postConnect(ctx context.Context, start bool) {
 	conn.io = bufio.NewReadWriter(
 		bufio.NewReader(conn.sock),
 		bufio.NewWriter(conn.sock))
@@ -483,7 +485,7 @@ func hasPort(s string) bool {
 // send is started as a goroutine after a connection is established.
 // It shuttles data from the output channel to write(), and is killed
 // when the context is cancelled.
-func (conn *Conn) send(ctx context.Context) {
+func (conn *Connection) send(ctx context.Context) {
 	for {
 		select {
 		case line := <-conn.out:
@@ -505,7 +507,7 @@ func (conn *Conn) send(ctx context.Context) {
 // recv is started as a goroutine after a connection is established.
 // It receives "\r\n" terminated lines from the server, parses them into
 // Lines, and sends them to the input channel.
-func (conn *Conn) recv() {
+func (conn *Connection) recv() {
 	for {
 		s, err := conn.io.ReadString('\n')
 		if err != nil {
@@ -531,7 +533,7 @@ func (conn *Conn) recv() {
 
 // ping is started as a goroutine after a connection is established, as
 // long as Config.PingFreq >0. It pings the server every PingFreq seconds.
-func (conn *Conn) ping(ctx context.Context) {
+func (conn *Connection) ping(ctx context.Context) {
 	defer conn.wg.Done()
 	tick := time.NewTicker(conn.cfg.PingFreq)
 	for {
@@ -549,7 +551,7 @@ func (conn *Conn) ping(ctx context.Context) {
 // runLoop is started as a goroutine after a connection is established.
 // It pulls Lines from the input channel and dispatches them to any
 // handlers that have been registered for that IRC verb.
-func (conn *Conn) runLoop(ctx context.Context) {
+func (conn *Connection) runLoop(ctx context.Context) {
 	for {
 		select {
 		case line := <-conn.in:
@@ -568,7 +570,7 @@ func (conn *Conn) runLoop(ctx context.Context) {
 
 // write writes a \r\n terminated line of output to the connected server,
 // using Hybrid's algorithm to rate limit if conn.cfg.Flood is false.
-func (conn *Conn) write(line string) error {
+func (conn *Connection) write(line string) error {
 	if !conn.cfg.Flood {
 		if t := conn.rateLimit(len(line)); t != 0 {
 			// sleep for the current line's time value before sending it
@@ -592,20 +594,20 @@ func (conn *Conn) write(line string) error {
 }
 
 // rateLimit implements Hybrid's flood control algorithm for outgoing lines.
-func (conn *Conn) rateLimit(chars int) time.Duration {
+func (conn *Connection) rateLimit(chars int) time.Duration {
 	// Hybrid's algorithm allows for 2 seconds per line and an additional
 	// 1/120 of a second per character on that line.
-	linetime := 2*time.Second + time.Duration(chars)*time.Second/120
-	elapsed := time.Now().Sub(conn.lastsent)
-	if conn.badness += linetime - elapsed; conn.badness < 0 {
+	lineTime := 2*time.Second + time.Duration(chars)*time.Second/120
+	elapsed := time.Now().Sub(conn.lastSent)
+	if conn.badness += lineTime - elapsed; conn.badness < 0 {
 		// negative badness times are badness...
 		conn.badness = 0
 	}
-	conn.lastsent = time.Now()
+	conn.lastSent = time.Now()
 	// If we've sent more than 10 second's worth of lines according to the
 	// calculation above, then we're at risk of "Excess Flood".
 	if conn.badness > 10*time.Second {
-		return linetime
+		return lineTime
 	}
 	return 0
 }
@@ -613,7 +615,7 @@ func (conn *Conn) rateLimit(chars int) time.Duration {
 // Close tears down all connection-related state. It is called when either
 // the sending or receiving goroutines encounter an error.
 // It may also be used to forcibly shut down the connection to the server.
-func (conn *Conn) Close() error {
+func (conn *Connection) Close() error {
 	// Guard against double-call of Close() if we get an error in send()
 	// as calling sock.Close() will cause recv() to receive EOF in readstring()
 	conn.mu.Lock()
@@ -640,7 +642,7 @@ func (conn *Conn) Close() error {
 }
 
 // drainIn sends all data buffered in conn.in to /dev/null.
-func (conn *Conn) drainIn() {
+func (conn *Connection) drainIn() {
 	for {
 		select {
 		case <-conn.in:
@@ -651,7 +653,7 @@ func (conn *Conn) drainIn() {
 }
 
 // drainOut does the same for conn.out. Generics!
-func (conn *Conn) drainOut() {
+func (conn *Connection) drainOut() {
 	for {
 		select {
 		case <-conn.out:
@@ -663,8 +665,8 @@ func (conn *Conn) drainOut() {
 
 // Dumps a load of information about the current state of the connection to a
 // string for debugging state tracking and other such things.
-func (conn *Conn) String() string {
-	str := "GoIRC Connection\n"
+func (conn *Connection) String() string {
+	str := "IRCLib Connection\n"
 	str += "----------------\n\n"
 	if conn.Connected() {
 		str += "Connected to " + conn.cfg.Server + "\n\n"
