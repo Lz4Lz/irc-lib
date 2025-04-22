@@ -1,8 +1,6 @@
 package crypto
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -36,62 +34,19 @@ func NewCryptKey() (*CryptKey, error) {
 	}, nil
 }
 
-// EncryptData encrypts plaintext using the Key with AES GCM
-func (k *CryptKey) EncryptData(plaintext []byte) ([]byte, error) {
-	// Create AES cipher block
-	block, err := aes.NewCipher(k.Key)
+// EncryptData encrypts data using the Key with AES GCM.
+// The output data is in the form of (IV/nonce) + (ciphertext).
+func (k *CryptKey) EncryptData(data []byte) ([]byte, error) {
+	encrypted, err := encryptDataWithKey(data, k.Key)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create cipher: %w", err)
+		return nil, err
 	}
 
-	// Create AES GCM
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create GCM: %w", err)
-	}
-
-	// Generate random 12-byte IV (nonce)
-	iv := make([]byte, gcm.NonceSize()) // 12 bytes for AES-GCM (by default at least)
-	_, err = rand.Read(iv)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate IV: %w", err)
-	}
-
-	// Encrypt plaintext
-	ciphertext := gcm.Seal(nil, iv, plaintext, nil)
-
-	return append(iv, ciphertext...), nil
+	return encrypted, nil
 }
 
-// DecryptData decrypts data (IV and ciphertext) using the Key with AES GCM
+// DecryptData decrypts data (IV and ciphertext) using the Key with AES GCM.
+// The output data is the original unencrypted data.
 func (k *CryptKey) DecryptData(data []byte) ([]byte, error) {
-	// Create AES cipher block
-	block, err := aes.NewCipher(k.Key)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create cipher: %w", err)
-	}
-
-	// Create AES GCM
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create GCM: %w", err)
-	}
-
-	// Check if data is long enough to contain IV and ciphertext
-	nonceSize := gcm.NonceSize() // 12 bytes
-	if len(data) < nonceSize {
-		return nil, fmt.Errorf("data too short: missing IV")
-	}
-
-	// Split IV and ciphertext
-	iv := data[:nonceSize]
-	ciphertext := data[nonceSize:]
-
-	// Decrypt ciphertext
-	plaintext, err := gcm.Open(nil, iv, ciphertext, nil)
-	if err != nil {
-		return nil, fmt.Errorf("decryption failed: %w", err)
-	}
-
-	return plaintext, nil
+	return decryptDataWithKey(data, k.Key)
 }
