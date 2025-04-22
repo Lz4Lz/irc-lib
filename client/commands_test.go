@@ -107,7 +107,7 @@ func TestClientCommands(t *testing.T) {
 	s.nc.Expect("PART #foo :Screw you guys...")
 
 	c.Quit()
-	s.nc.Expect("QUIT :GoBye!")
+	s.nc.Expect("QUIT :Goodbye!")
 	c.Quit("I'm going home.")
 	s.nc.Expect("QUIT :I'm going home.")
 

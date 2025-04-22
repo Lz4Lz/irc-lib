@@ -154,7 +154,7 @@ func TestCTCP(t *testing.T) {
 	c.h_CTCP(ParseLine(":blah!moo@cows.com PRIVMSG test :\001VERSION\001"))
 
 	// Expect a version reply
-	s.nc.Expect("NOTICE blah :\001VERSION Powered by GoIRC\001")
+	s.nc.Expect("NOTICE blah :\001VERSION GoIRCLibClient\001")
 
 	// Call handler with CTCP PING
 	c.h_CTCP(ParseLine(":blah!moo@cows.com PRIVMSG test :\001PING 1234567890\001"))
