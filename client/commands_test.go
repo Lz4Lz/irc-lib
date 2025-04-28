@@ -69,7 +69,7 @@ func TestSplitMessage(t *testing.T) {
 		{"0123456789012345", 16, []string{"0123456789012345"}},
 	}
 	for i, test := range tests {
-		out := splitMessage(test.in, test.sp)
+		out := SplitMessage(test.in, test.sp)
 		if !reflect.DeepEqual(test.out, out) {
 			t.Errorf("test %d: expected %q, got %q", i, test.out, out)
 		}

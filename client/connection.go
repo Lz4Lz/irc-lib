@@ -152,7 +152,7 @@ func NewClientConfig(nick string, args ...string) *ClientConfig {
 		Recover:                     (*Connection).LogPanic, // in dispatch.go
 		SplitLen:                    defaultSplit,
 		Timeout:                     60 * time.Second,
-		EnableCapabilityNegotiation: false,
+		EnableCapabilityNegotiation: true,
 	}
 	cfg.Me.Ident = "irclib"
 	if len(args) > 0 && args[0] != "" {
@@ -211,7 +211,9 @@ func Client(cfg *ClientConfig) *Connection {
 
 	dialer := new(net.Dialer)
 	dialer.Timeout = cfg.Timeout
-	dialer.DualStack = cfg.DualStack
+	if !cfg.DualStack {
+		dialer.FallbackDelay = -1
+	}
 	if cfg.LocalAddr != "" {
 		if !hasPort(cfg.LocalAddr) {
 			cfg.LocalAddr += ":0"

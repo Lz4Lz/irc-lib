@@ -25,7 +25,7 @@ func NewCryptKey() (*CryptKey, error) {
 
 	// Compute KeyID (first 16 bytes of base64-encoded SHA-256-hashed key)
 	hash := sha256.Sum256(key)
-	keyIDBytes := hash[:16] // Truncate to 128 bits
+	keyIDBytes := hash[:16]
 	keyID := base64.StdEncoding.EncodeToString(keyIDBytes)
 
 	return &CryptKey{

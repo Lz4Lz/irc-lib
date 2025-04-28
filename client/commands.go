@@ -65,11 +65,11 @@ func indexFragment(s string) int {
 	return -1
 }
 
-// splitMessage splits a message > splitLen chars at:
+// SplitMessage splits a message > splitLen chars at:
 //  1. the end of the last sentence fragment before splitLen
 //  2. the end of the last word before splitLen
 //  3. splitLen itself
-func splitMessage(msg string, splitLen int) (msgs []string) {
+func SplitMessage(msg string, splitLen int) (msgs []string) {
 	// This is quite short ;-)
 	if splitLen < 13 {
 		splitLen = defaultSplit
@@ -186,7 +186,7 @@ func (conn *Connection) Who(nick string) { conn.Raw(WHO + " " + nick) }
 // PRIVMSG t :msg
 func (conn *Connection) Privmsg(t, msg string) {
 	prefix := PRIVMSG + " " + t + " :"
-	for _, s := range splitMessage(msg, conn.cfg.SplitLen) {
+	for _, s := range SplitMessage(msg, conn.cfg.SplitLen) {
 		conn.Raw(prefix + s)
 	}
 }
@@ -217,7 +217,7 @@ func (conn *Connection) Privmsgf(t, format string, a ...interface{}) {
 //
 //	NOTICE t :msg
 func (conn *Connection) Notice(t, msg string) {
-	for _, s := range splitMessage(msg, conn.cfg.SplitLen) {
+	for _, s := range SplitMessage(msg, conn.cfg.SplitLen) {
 		conn.Raw(NOTICE + " " + t + " :" + s)
 	}
 }
@@ -228,7 +228,7 @@ func (conn *Connection) Notice(t, msg string) {
 //	PRIVMSG t :\001CTCP arg\001
 func (conn *Connection) Ctcp(t, ctcp string, arg ...string) {
 	// We need to split again here to ensure
-	for _, s := range splitMessage(strings.Join(arg, " "), conn.cfg.SplitLen) {
+	for _, s := range SplitMessage(strings.Join(arg, " "), conn.cfg.SplitLen) {
 		if s != "" {
 			s = " " + s
 		}
@@ -242,7 +242,7 @@ func (conn *Connection) Ctcp(t, ctcp string, arg ...string) {
 //
 //	NOTICE t :\001CTCP arg\001
 func (conn *Connection) CtcpReply(t, ctcp string, arg ...string) {
-	for _, s := range splitMessage(strings.Join(arg, " "), conn.cfg.SplitLen) {
+	for _, s := range SplitMessage(strings.Join(arg, " "), conn.cfg.SplitLen) {
 		if s != "" {
 			s = " " + s
 		}
