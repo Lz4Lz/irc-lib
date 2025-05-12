@@ -11,7 +11,7 @@ import (
 
 // generateLabel generates a unique label for message co-relation
 func generateLabel() string {
-	return fmt.Sprintf("l%d", time.Now().UnixNano()+int64(rand.Intn(1000)))
+	return fmt.Sprintf("%d", time.Now().UnixNano()+int64(rand.Intn(1000)))
 }
 
 // Message represents a message
@@ -51,7 +51,7 @@ type Message struct {
 func NewMessage(target, text string) *Message {
 	return &Message{
 		Id:        "",
-		Label:     generateLabel(),
+		Label:     "l" + generateLabel(),
 		Sender:    "",
 		Target:    target,
 		Text:      text,
@@ -67,7 +67,8 @@ type MessageStore struct {
 	out      chan *Message
 }
 
-// Add or update a message in the store
+// Add or update a message in the store.
+// This can be used for manual overrides but it is not recommended.
 func (ms *MessageStore) AddOrUpdateLocal(msg *Message) {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
@@ -108,14 +109,12 @@ func (ms *MessageStore) SendNewMessage(conn *client.Connection, target, text str
 
 // FuncHandler implements an IRCLib FuncHandler for PRIVMSGs
 func (ms *MessageStore) FuncHandler(conn *client.Connection, line *client.Line) {
-	if line.Cmd != client.PRIVMSG {
+	if line.Cmd != client.PRIVMSG || line.Tags == nil {
 		return
 	}
 
-	// Message tags are essential to this part so we must rely on it
-	if !conn.SupportsCapability("message-tags") {
-		return
-	}
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
 
 	// Handle our own messages (local)
 	if line.Nick == conn.Me().Nick && ms.messages[line.Tags["label"]] != nil {
@@ -138,7 +137,7 @@ func (ms *MessageStore) FuncHandler(conn *client.Connection, line *client.Line) 
 			IsDeleted: false,
 			ReplyTo:   nil,
 		}
-		ms.AddOrUpdateLocal(msg)
+		ms.messages[msg.Label] = msg
 		ms.out <- msg
 		return
 	}
